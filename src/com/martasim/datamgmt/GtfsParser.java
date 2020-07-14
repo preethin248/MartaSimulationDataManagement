@@ -10,6 +10,7 @@ import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.zip.ZipFile;
 
 class GtfsParser extends Parser {
@@ -21,6 +22,7 @@ class GtfsParser extends Parser {
     @Override
     public void parse() {
         try {
+            System.out.println(zipFile.getName());
             System.out.println("Parsing Route");
             addRoutes(zipFile.getInputStream(zipFile.getEntry("gtfs022118/routes.txt")));
             System.out.println("Finished Routes, Parsing Stops");
@@ -215,9 +217,10 @@ class GtfsParser extends Parser {
             map.put(labels[i], i);
         }
 
-        String currentBusId = "";
+        String currentBusId = null;
         ArrayList<String> stopIdList = new ArrayList<>();
         HashMap<String, String[]> busMap = createBusMap(zipFile.getInputStream(zipFile.getEntry("gtfs022118/trips.txt")));
+        HashSet<String> completedRoutes = new HashSet<>();
 
         String line;
         while ((line = br.readLine()) != null && !line.isEmpty()) {
@@ -227,7 +230,7 @@ class GtfsParser extends Parser {
             String stopId = st[map.get("stop_id")];
             String stopIndex = st[map.get("stop_sequence")];
 
-            if (currentBusId.equals("")) { //first line
+            if (currentBusId == null) { //first line
                 currentBusId = busId;
             }
 
@@ -235,49 +238,9 @@ class GtfsParser extends Parser {
                 //finished going through current trip's stops, time to add to database
                 String routeId = busMap.get(currentBusId)[0];
                 String outbound = busMap.get(currentBusId)[1];
-
-                StringBuilder sb = new StringBuilder("INSERT INTO routeToStop values ");
-                String currentStopId;
-                int stopSequence;
-                if (outbound.equals("0")) { //0 = outbound, retain original stop sequence
-                    for (int i = 0; i < stopIdList.size(); i++) {
-
-                        currentStopId = stopIdList.get(i);
-                        stopSequence = i;
-                        sb.append(String.format(
-                                "('%s', '%s', %d)",
-                                routeId,
-                                currentStopId,
-                                stopSequence
-                        ));
-
-                        if (i < stopIdList.size() - 1) {
-                            sb.append(',');
-                        }
-                    }
-                } else { //1 = inbound, want to reverse the stop sequence
-                    for (int i = stopIdList.size() - 1; i >= 0; i--) {
-                        currentStopId = stopIdList.get(i);
-                        stopSequence = stopIdList.size() - i;
-                        sb.append(String.format(
-                                "('%s', '%s', %d)",
-                                routeId,
-                                currentStopId,
-                                stopSequence
-                        ));
-
-                        if (i > 0) {
-                            sb.append(',');
-                        }
-
-                    }
-                }
-
-                //insert all the rows for a bus/trip into routeToStop
-                try {
-                    ((SQLiteDatabase) database).executeUpdate(sb.toString());
-                } catch (SQLException sqlException) {
-                    sqlException.printStackTrace();
+                if (!completedRoutes.contains(routeId)) {
+                    addStopsToRoutesInDatabase(stopIdList, routeId, outbound);
+                    completedRoutes.add(routeId);
                 }
 
                 //for new trip
@@ -290,6 +253,61 @@ class GtfsParser extends Parser {
         }
 
         br.close();
+
+        if (!stopIdList.isEmpty()) {
+            String routeId = busMap.get(currentBusId)[0];
+            String outbound = busMap.get(currentBusId)[1];
+            if (!completedRoutes.contains(routeId)) {
+                addStopsToRoutesInDatabase(stopIdList, routeId, outbound);
+            }
+        }
+    }
+
+    private void addStopsToRoutesInDatabase(ArrayList<String> stopIdList, String routeId, String outbound) {
+
+        StringBuilder sb = new StringBuilder("INSERT INTO routeToStop values ");
+        String currentStopId;
+        int stopSequence;
+        if (outbound.equals("0")) { //0 = outbound, retain original stop sequence
+            for (int i = 0; i < stopIdList.size(); i++) {
+
+                currentStopId = stopIdList.get(i);
+                stopSequence = i;
+                sb.append(String.format(
+                        "('%s', '%s', %d)",
+                        routeId,
+                        currentStopId,
+                        stopSequence
+                ));
+
+                if (i < stopIdList.size() - 1) {
+                    sb.append(',');
+                }
+            }
+        } else { //1 = inbound, want to reverse the stop sequence
+            for (int i = stopIdList.size() - 1; i >= 0; i--) {
+                currentStopId = stopIdList.get(i);
+                stopSequence = stopIdList.size() - i;
+                sb.append(String.format(
+                        "('%s', '%s', %d)",
+                        routeId,
+                        currentStopId,
+                        stopSequence
+                ));
+
+                if (i > 0) {
+                    sb.append(',');
+                }
+
+            }
+        }
+
+        //insert all the rows for a bus/trip into routeToStop
+        try {
+            ((SQLiteDatabase) database).executeUpdate(sb.toString());
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+        }
     }
 
     private void addEvents(InputStream inputStream) throws IOException {
