@@ -16,8 +16,7 @@ public class ParserTest {
 
     @BeforeAll
     static void parse_data() throws SQLException, IOException {
-        ZipFile zip = new ZipFile("C:\\Users\\amaan\\Documents\\GitHub\\MartaSimDataMgmt\\src\\com\\martasim\\data" +
-                "\\gtfs022118.zip");
+        ZipFile zip = new ZipFile("/Users/lingtham/Desktop/CS3300/MartaSimDataMgmt/src/com/martasim/data/gtfs022118.zip");
         db = DatabaseFactory.createDatabaseFromGtfs(zip);
     }
 
@@ -41,5 +40,16 @@ public class ParserTest {
         assertEquals(mid_stop, db.getStop("900788"));
         assertEquals(quote_stop, db.getStop("213316"));
         assertEquals(9172, db.getAllStops().size());
+    }
+
+    @Test
+    void parse_stopToRoute() throws IOException, SQLException {
+        Route routeA = db.getRoute("7687");
+        Route routeB = db.getRoute("7682");
+        Route routeC = db.getRoute("8766");
+
+        assertEquals(routeA.getStops().size(), 55);
+        assertEquals(routeB.getStops().size(), 39);
+        assertEquals(routeC.getStops().size(), 6);
     }
 }

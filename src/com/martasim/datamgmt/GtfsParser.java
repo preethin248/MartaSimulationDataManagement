@@ -1,12 +1,14 @@
 package com.martasim.datamgmt;
 
 import com.martasim.models.Route;
+import com.sun.xml.internal.ws.api.ha.StickyFeature;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.zip.ZipFile;
 
@@ -25,7 +27,9 @@ class GtfsParser extends Parser {
             addStops(zipFile.getInputStream(zipFile.getEntry("gtfs022118/stops.txt")));
             System.out.println("Finished Stops, Parsing Buses");
             addBuses(zipFile.getInputStream(zipFile.getEntry("gtfs022118/trips.txt")));
-            System.out.println("Finished Buses, Parsing Events");
+            System.out.println("Finished Buses, Parsing StopsToRoute");
+            addStopsToRoutes(zipFile.getInputStream(zipFile.getEntry("gtfs022118/stop_times.txt")));
+            System.out.println("Finished StopsToRoutes, Parsing Events");
             addEvents(zipFile.getInputStream(zipFile.getEntry("gtfs022118/stop_times.txt")));
             System.out.println("Finished Events");
         } catch (IOException ioException) {
@@ -163,6 +167,127 @@ class GtfsParser extends Parser {
 //                sqlException.printStackTrace();
 //            }
 //        }
+
+        br.close();
+    }
+
+    /*
+    You can delete this method after addBuses is done and move the bus hashmap to addBuses.
+    I needed to loop through trips.txt to grab the routeId and directionId of the trip's connected to the stop
+    but the addBuses function wasn't done yet so I used this function.
+     */
+    private HashMap<String, String[]> createBusMap(InputStream inputStream) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
+
+        HashMap<String, String[]>busMap = new HashMap<>();
+
+        HashMap<String, Integer> map = new HashMap<>();
+        String[] labels = br.readLine().split(",");
+        for (int i = 0; i < labels.length; i++) {
+            map.put(labels[i], i);
+        }
+
+        String line;
+        String[] busInfo = new String[2];
+        String routeId;
+        String busId;
+        String outbound; // 0 = outbound, 1 = inbound
+
+        while ((line = br.readLine()) != null && !line.isEmpty()) {
+            String st[] = (line + ", ").split(",");
+            routeId = st[map.get("route_id")];
+            busId = st[map.get("trip_id")];
+            outbound = st[map.get("direction_id")].trim();
+
+            busMap.put(busId, new String[] {routeId, outbound});
+        }
+
+        br.close();
+
+        return busMap;
+    }
+
+    private void addStopsToRoutes(InputStream inputStream) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
+        HashMap<String, Integer> map = new HashMap<>();
+        String[] labels = br.readLine().split(",");
+        for (int i = 0; i < labels.length; i++) {
+            map.put(labels[i], i);
+        }
+
+        String currentBusId = "";
+        ArrayList<String> stopIdList = new ArrayList<>();
+        HashMap<String, String[]> busMap = createBusMap(zipFile.getInputStream(zipFile.getEntry("gtfs022118/trips.txt")));
+
+        String line;
+        while ((line = br.readLine()) != null && !line.isEmpty()) {
+
+            String[] st = (line + " ").split(",");
+            String busId = st[map.get("trip_id")];
+            String stopId = st[map.get("stop_id")];
+            String stopIndex = st[map.get("stop_sequence")];
+
+            if (currentBusId.equals("")) { //first line
+                currentBusId = busId;
+            }
+
+            if (!busId.equals(currentBusId)) { //new trip
+                //finished going through current trip's stops, time to add to database
+                String routeId = busMap.get(currentBusId)[0];
+                String outbound = busMap.get(currentBusId)[1];
+
+                StringBuilder sb = new StringBuilder("INSERT INTO routeToStop values ");
+                String currentStopId;
+                int stopSequence;
+                if (outbound.equals("0")) { //0 = outbound, retain original stop sequence
+                    for (int i = 0; i < stopIdList.size(); i++) {
+
+                        currentStopId = stopIdList.get(i);
+                        stopSequence = i;
+                        sb.append(String.format(
+                                "('%s', '%s', %d)",
+                                routeId,
+                                currentStopId,
+                                stopSequence
+                        ));
+
+                        if (i < stopIdList.size() - 1) {
+                            sb.append(',');
+                        }
+                    }
+                } else { //1 = inbound, want to reverse the stop sequence
+                    for (int i = stopIdList.size() - 1; i >= 0; i--) {
+                        currentStopId = stopIdList.get(i);
+                        stopSequence = stopIdList.size() - i;
+                        sb.append(String.format(
+                                "('%s', '%s', %d)",
+                                routeId,
+                                currentStopId,
+                                stopSequence
+                        ));
+
+                        if (i > 0) {
+                            sb.append(',');
+                        }
+
+                    }
+                }
+
+                //insert all the rows for a bus/trip into routeToStop
+                try {
+                    ((SQLiteDatabase) database).executeUpdate(sb.toString());
+                } catch (SQLException sqlException) {
+                    sqlException.printStackTrace();
+                }
+
+                //for new trip
+                currentBusId = busId;
+                stopIdList = new ArrayList<>();
+            }
+
+            stopIdList.add(stopId);
+
+        }
 
         br.close();
     }
