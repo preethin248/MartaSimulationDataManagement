@@ -70,7 +70,7 @@ public class Bus {
     }
 
     public int getOutboundAsInt() {
-        return outbound ? 1 : 0;
+        return outbound ? 0 : 1;
     }
 
     public void setOutbound(boolean outbound) {
@@ -78,7 +78,7 @@ public class Bus {
     }
 
     public void setOutbound(int outbound) {
-        this.outbound = outbound != 0;
+        this.outbound = outbound == 0;
     }
 
     public int getCurrentStopIndex() {
