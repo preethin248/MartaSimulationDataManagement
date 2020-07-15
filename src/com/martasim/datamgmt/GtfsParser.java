@@ -39,20 +39,23 @@ class GtfsParser extends Parser {
     @Override
     public void parse(DayOfTheWeek dayOfTheWeek) {
         try {
-            // TODO: get serviceIds based on the day of the week
-            // TODO: get all routeIds to parse based on the serviceIds
+
             System.out.println(zipFile.getName());
-            HashSet<String> serviceIds = getServiceIdsFromDay(dayOfTheWeek, zipFile.getInputStream(zipFile.getEntry("gtfs022118/calendar.txt")));
+            HashSet<String> serviceIds = getServiceIdsFromDay(dayOfTheWeek, getInputStream("calendar.txt"));
             System.out.println("Parsing Route");
-            // TODO: pass in routeIds to parse
-            addRoutes(getInputStream("routes.txt"));
+
+            HashSet<String> routeIds = getRouteIdsByServiceIds(getInputStream("trips.txt"), serviceIds);
+            addRoutes(getInputStream("routes.txt"), routeIds);
+
             System.out.println("Finished Routes, Parsing Stops");
             addStops(getInputStream("stops.txt"));
             System.out.println("Finished Stops, Parsing Buses");
             addBuses(zipFile.getInputStream(zipFile.getEntry("gtfs022118/trips.txt")), serviceIds);
             System.out.println("Finished Buses, Parsing StopsToRoute");
-            // TODO: pass in routesIds to parse
-            addStopsToRoutes(getInputStream("stop_times.txt"));
+
+            HashSet<String> busIds = getBusIdsByServiceIds(getInputStream("trips.txt"), serviceIds);
+            addStopsToRoutes(getInputStream("stop_times.txt"), busIds);
+
             System.out.println("Finished StopsToRoutes, Parsing Events");
             addEvents(getInputStream("stop_times.txt"));
             System.out.println("Finished Events");
@@ -117,7 +120,61 @@ class GtfsParser extends Parser {
         return serviceIds;
     }
 
-    private void addRoutes(InputStream inputStream) throws IOException {
+    private HashSet<String> getRouteIdsByServiceIds(InputStream inputStream, HashSet<String> serviceIds) throws IOException{
+        BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
+
+        //initialize hash map with the first row of the file
+        HashMap<String, Integer> map = new HashMap<>();
+        String[] labels = br.readLine().split(",");
+        for (int i = 0; i < labels.length; i++) {
+            map.put(labels[i], i);
+        }
+
+        HashSet<String> routeIds = new HashSet<>();
+
+        String line;
+        while ((line = br.readLine()) != null) {
+            String[] st = (line + ", ").split(",");
+
+            String serviceId = st[map.get("service_id")];
+            if (serviceIds.contains(serviceId)) {
+                routeIds.add(st[map.get("route_id")]);
+            }
+        }
+
+        br.close();
+
+        return routeIds;
+    }
+
+    private HashSet<String> getBusIdsByServiceIds(InputStream inputStream, HashSet<String> serviceIds) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
+
+        //initialize hash map with the first row of the file
+        HashMap<String, Integer> map = new HashMap<>();
+        String[] labels = br.readLine().split(",");
+        for (int i = 0; i < labels.length; i++) {
+            map.put(labels[i], i);
+        }
+
+        HashSet<String> busIds = new HashSet<>();
+
+        String line;
+        while ((line = br.readLine()) != null) {
+            String[] st = (line + ", ").split(",");
+
+            String serviceId = st[map.get("service_id")];
+            if (serviceIds.contains(serviceId)) {
+                busIds.add(st[map.get("trip_id")]);
+            }
+        }
+
+        br.close();
+
+        return busIds;
+    }
+
+    private void addRoutes(InputStream inputStream, HashSet<String> routeIds) throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
 
         //initialize hash map with the first row of the file
@@ -135,7 +192,11 @@ class GtfsParser extends Parser {
                 for (int i = 0; i < labels.length; i++) {
                     map.replace(labels[i], st[i]);
                 }
-                database.addRoute(new Route(map.get("route_id"), map.get("route_short_name"), map.get("route_long_name")));
+
+                String routeId = map.get("route_id");
+                if (routeIds.contains(routeId)) {
+                    database.addRoute(new Route(routeId, map.get("route_short_name"), map.get("route_long_name")));
+                }
             } catch (SQLException sqlException) {
                 sqlException.printStackTrace();
             }
@@ -315,7 +376,7 @@ class GtfsParser extends Parser {
     I needed to loop through trips.txt to grab the routeId and directionId of the trip's connected to the stop
     but the addBuses function wasn't done yet so I used this function.
      */
-    private HashMap<String, String[]> createBusMap(InputStream inputStream) throws IOException {
+    private HashMap<String, String[]> createBusMap(InputStream inputStream, HashSet<String> busIds) throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
 
         HashMap<String, String[]> busMap = new HashMap<>();
@@ -335,6 +396,11 @@ class GtfsParser extends Parser {
             String[] st = (line + ", ").split(",");
             routeId = st[map.get("route_id")];
             busId = st[map.get("trip_id")];
+
+            if (!busIds.contains(busId)) {
+                continue;
+            }
+
             outbound = st[map.get("direction_id")].trim();
 
             busMap.put(busId, new String[] {routeId, outbound});
@@ -345,7 +411,7 @@ class GtfsParser extends Parser {
         return busMap;
     }
 
-    private void addStopsToRoutes(InputStream inputStream) throws IOException {
+    private void addStopsToRoutes(InputStream inputStream, HashSet<String> busIds) throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
         HashMap<String, Integer> map = new HashMap<>();
         String[] labels = br.readLine().split(",");
@@ -355,7 +421,7 @@ class GtfsParser extends Parser {
 
         String currentBusId = null;
         Map<Integer, String> stopSequenceToId = new TreeMap<>();
-        HashMap<String, String[]> busMap = createBusMap(getInputStream("trips.txt"));
+        HashMap<String, String[]> busMap = createBusMap(getInputStream("trips.txt"), busIds);
         HashSet<String> completedRoutes = new HashSet<>();
 
         String line;
@@ -363,8 +429,14 @@ class GtfsParser extends Parser {
 
             String[] st = (line + ", ").split(",");
             String busId = st[map.get("trip_id")];
+
+            if (!busIds.contains(busId)) {
+                continue;
+            }
+
             String stopId = st[map.get("stop_id")];
             int stopIndex = Integer.parseInt(st[map.get("stop_sequence")]);
+
 
             if (currentBusId == null) { //first line
                 currentBusId = busId;

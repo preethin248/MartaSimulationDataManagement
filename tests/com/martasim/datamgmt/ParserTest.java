@@ -130,25 +130,25 @@ public class ParserTest {
     @Test
     void parse_stopToRoute() throws IOException, SQLException {
         Route routeA = db.getRoute("7687");
-        Route routeB = db.getRoute("7682");
-        Route routeC = db.getRoute("8766");
+        //Route routeB = db.getRoute("7682");
+        //Route routeC = db.getRoute("8766");
 
-        assertEquals(routeA.getStops().size(), 55);
-        assertEquals(routeB.getStops().size(), 39);
-        assertEquals(routeC.getStops().size(), 15);
+        assertEquals(routeA.getStops().size(), 58);
+       // assertEquals(routeB.getStops().size(), 39);
+       // assertEquals(routeC.getStops().size(), 15);
     }
 
     @Test
     void parse_bus() throws SQLException {
-        Bus firstBus = new Bus("6062219", db.getRoute("7634"), true, -1, 33.771889,
+        Bus firstBus = new Bus("6053989", db.getRoute("7638"), false, -1, 33.921202,
+                -84.344649, 0, 50, 100, 100, 0);
+        Bus midBus = new Bus("6043732", db.getRoute("7688"), false, -1, 33.771889,
                 -84.386959, 0, 50, 100, 100, 0);
-        Bus midBus = new Bus("6045456", db.getRoute("7735"), false, -1, 33.80365,
-                -84.414991, 0, 50, 100, 100, 0);
         Bus lastBus = new Bus("2475833", db.getRoute("8766"), false, -1, 33.753612,
                 -84.391008, 0, 50, 100, 100, 0);
 
-        assertEquals(firstBus, db.getBus("6062219"));
-        assertEquals(midBus, db.getBus("6045456"));
+        assertEquals(firstBus, db.getBus("6053989"));
+        assertEquals(midBus, db.getBus("6043732"));
         assertEquals(lastBus, db.getBus("2475833"));
 //        assertEquals(24596, db.getAllBuses().size());
     }
