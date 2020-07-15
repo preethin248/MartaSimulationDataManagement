@@ -1,5 +1,6 @@
 package com.martasim.datamgmt;
 
+import com.martasim.models.Bus;
 import com.martasim.models.Route;
 import com.martasim.models.Stop;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,5 +54,20 @@ public class ParserTest {
         assertEquals(routeA.getStops().size(), 55);
         assertEquals(routeB.getStops().size(), 39);
         assertEquals(routeC.getStops().size(), 15);
+    }
+
+    @Test
+    void parse_bus() throws SQLException {
+        Bus firstBus = new Bus("6062219", db.getRoute("7634"), true, -1, 33.771889,
+                -84.386959, 0, 50, 100, 100, 0);
+        Bus midBus = new Bus("6045456", db.getRoute("7735"), false, -1, 33.80365,
+                -84.414991, 0, 50, 100, 100, 0);
+        Bus lastBus = new Bus("2475833", db.getRoute("8766"), false, -1, 33.753612,
+                -84.391008, 0, 50, 100, 100, 0);
+
+        assertEquals(firstBus, db.getBus("6062219"));
+        assertEquals(midBus, db.getBus("6045456"));
+        assertEquals(lastBus, db.getBus("2475833"));
+//        assertEquals(24596, db.getAllBuses().size());
     }
 }

@@ -37,19 +37,20 @@ public class Bus {
 
     @Override
     public String toString() {
-        return "('" +
-                id + "', " +
-                (route == null ? "null" : route.id) + ", " +
-                outbound + ", " +
-                currentStop + ", " +
-                latitude + ", " +
-                longitude + ", " +
-                passengers + ", " +
-                passengerCapacity + ", " +
-                fuel + ", " +
-                fuelCapacity + ", " +
-                speed +
-                ")";
+        return String.format(
+                "('%s', '%s', %d, %d, %f, %f, %d, %d, %f, %f, %f)",
+                id,
+                (route == null ? "null" : route.getId()),
+                outbound ? 0 : 1,
+                currentStop,
+                latitude,
+                longitude,
+                passengers,
+                passengerCapacity,
+                fuel,
+                fuelCapacity,
+                speed
+        );
     }
 
     public String getId() {

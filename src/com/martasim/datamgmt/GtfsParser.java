@@ -1,16 +1,16 @@
 package com.martasim.datamgmt;
 
+import com.martasim.models.Bus;
 import com.martasim.models.Route;
-import com.sun.xml.internal.ws.api.ha.StickyFeature;
+import javafx.util.Pair;
+import sun.reflect.generics.tree.Tree;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.*;
 import java.util.zip.ZipFile;
 
 class GtfsParser extends Parser {
@@ -22,14 +22,19 @@ class GtfsParser extends Parser {
     @Override
     public void parse() {
         try {
+            // TODO: get serviceIds based on the day of the week
+            // TODO: get all routeIds to parse based on the serviceIds
             System.out.println(zipFile.getName());
             System.out.println("Parsing Route");
+            // TODO: pass in routeIds to parse
             addRoutes(zipFile.getInputStream(zipFile.getEntry("gtfs022118/routes.txt")));
             System.out.println("Finished Routes, Parsing Stops");
             addStops(zipFile.getInputStream(zipFile.getEntry("gtfs022118/stops.txt")));
             System.out.println("Finished Stops, Parsing Buses");
-            addBuses(zipFile.getInputStream(zipFile.getEntry("gtfs022118/trips.txt")));
+            // TODO: put hashSet of serviceIds based on the day of the week
+            addBuses(new HashSet<>(Arrays.asList("3", "4", "5")), zipFile.getInputStream(zipFile.getEntry("gtfs022118/trips.txt")));
             System.out.println("Finished Buses, Parsing StopsToRoute");
+            // TODO: pass in routesIds to parse
             addStopsToRoutes(zipFile.getInputStream(zipFile.getEntry("gtfs022118/stop_times.txt")));
             System.out.println("Finished StopsToRoutes, Parsing Events");
             addEvents(zipFile.getInputStream(zipFile.getEntry("gtfs022118/stop_times.txt")));
@@ -51,7 +56,7 @@ class GtfsParser extends Parser {
 
         String line;
         while ((line = br.readLine()) != null) {
-            String[] st = (line + " ").split(",");
+            String[] st = (line + ", ").split(",");
 
             try {
                 for (int i = 0; i < labels.length; i++) {
@@ -80,7 +85,7 @@ class GtfsParser extends Parser {
         int counter = 0;
         String line;
         while ((line = br.readLine()) != null && !line.isEmpty()) {
-            String[] st = (line + " ").split(",");
+            String[] st = (line + ", ").split(",");
             int st_index = 0;
             //update strings including apostrophes to work with SQL INSERT command
             for (String label: labels) {
@@ -134,8 +139,11 @@ class GtfsParser extends Parser {
         br.close();
     }
 
-    private void addBuses(InputStream inputStream) throws IOException {
+    private void addBuses(Set<String> serviceIds, InputStream inputStream) throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
+
+        Map<String, Pair<Double, Double>> shapeStartingLocations =
+                getShapeStartingLocations(zipFile.getInputStream(zipFile.getEntry("gtfs022118/shapes.txt")));
 
         HashMap<String, Integer> map = new HashMap<>();
         String[] labels = br.readLine().split(",");
@@ -143,34 +151,90 @@ class GtfsParser extends Parser {
             map.put(labels[i], i);
         }
 
-//        String line;
-//        while ((line = br.readLine()) != null && !line.isEmpty()) {
-//            String st[] = (line + ", ").split(",");
-//            String routeId = st[map.get("route_id")];
-//            String serviceId = st[map.get("service_id")];
-//            String busId = st[map.get("trip_id")];
-//            boolean outbound = st[map.get("direction_id")].trim().charAt(0) == '0';
-//
-//            try {
-//                // TODO: add bus here
-//                database.addBus(new Bus(
-//                        busId,
-//                        database.getRoute(routeId),
-//                        outbound,
-//                        /* TODO: get latitude */,
-//                        /* TODO: get longitude */,
-//                        /* TODO: get passengers */,
-//                        /* TODO: get passengerCapacity */,
-//                        /* TODO: get fuel */,
-//                        /* TODO: get fuelCapacity */,
-//                        /* TODO: get speed */
-//                        ));
-//            } catch (SQLException sqlException) {
-//                sqlException.printStackTrace();
-//            }
-//        }
+        StringBuilder sb = null;
+        int counter = 0;
+        String line;
+        while ((line = br.readLine()) != null && !line.isEmpty()) {
+            String[] st = (line + ", ").split(",");
+            String routeId = st[map.get("route_id")];
+            String serviceId = st[map.get("service_id")];
+            String busId = st[map.get("trip_id")];
+            boolean outbound = st[map.get("direction_id")].trim().charAt(0) == '0';
+            String shapeId = st[map.get("shape_id")];
+
+            if (!serviceIds.contains(serviceId)) {
+                continue;
+            }
+
+            if (counter % 10000 == 0) {
+                if (counter > 0) {
+                    try {
+                        ((SQLiteDatabase) database).executeUpdate(sb.toString());
+                    } catch (SQLException sqlException) {
+                        sqlException.printStackTrace();
+                    }
+                }
+                sb = new StringBuilder("INSERT INTO bus values ");
+            } else {
+                sb.append(',');
+            }
+            counter++;
+
+            sb.append(String.format(
+                    "('%s', '%s', %d, %d, %f, %f, %d, %d, %f, %f, %f)",
+                    busId,
+                    routeId,
+                    outbound ? 0 : 1,
+                    -1,
+                    shapeStartingLocations.get(shapeId).getKey(),
+                    shapeStartingLocations.get(shapeId).getValue(),
+                    0,
+                    50,
+                    100.0,
+                    100.0,
+                    0.0
+            ));
+        }
+        br.close();
+
+        if (counter % 10000 > 0) {
+            try {
+                ((SQLiteDatabase) database).executeUpdate(sb.toString());
+            } catch (SQLException sqlException) {
+                sqlException.printStackTrace();
+            }
+        }
+    }
+
+    public Map<String, Pair<Double, Double>> getShapeStartingLocations(InputStream inputStream) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
+
+        Map<String, Pair<Double, Double>> shapeStartingLocations = new HashMap<>();
+        Map<String, Integer> earliestPointForShape = new HashMap<>();
+
+        HashMap<String, Integer> map = new HashMap<>();
+        String[] labels = br.readLine().split(",");
+        for (int i = 0; i < labels.length; i++) {
+            map.put(labels[i], i);
+        }
+
+        String line;
+        while ((line = br.readLine()) != null && !line.isEmpty()) {
+            String[] st = (line + ", ").split(",");
+            String shapeId = st[map.get("shape_id")];
+            double lat = Double.parseDouble(st[map.get("shape_pt_lat")]);
+            double lon = Double.parseDouble(st[map.get("shape_pt_lon")]);
+            int seq = Integer.parseInt(st[map.get("shape_pt_sequence")]);
+
+            if (seq <= earliestPointForShape.getOrDefault(shapeId, Integer.MAX_VALUE)) {
+                shapeStartingLocations.put(shapeId, new Pair<>(lat, lon));
+                earliestPointForShape.put(shapeId, seq);
+            }
+        }
 
         br.close();
+
+        return shapeStartingLocations;
     }
 
     /*
@@ -181,7 +245,7 @@ class GtfsParser extends Parser {
     private HashMap<String, String[]> createBusMap(InputStream inputStream) throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
 
-        HashMap<String, String[]>busMap = new HashMap<>();
+        HashMap<String, String[]> busMap = new HashMap<>();
 
         HashMap<String, Integer> map = new HashMap<>();
         String[] labels = br.readLine().split(",");
@@ -190,13 +254,12 @@ class GtfsParser extends Parser {
         }
 
         String line;
-        String[] busInfo = new String[2];
         String routeId;
         String busId;
         String outbound; // 0 = outbound, 1 = inbound
 
         while ((line = br.readLine()) != null && !line.isEmpty()) {
-            String st[] = (line + ", ").split(",");
+            String[] st = (line + ", ").split(",");
             routeId = st[map.get("route_id")];
             busId = st[map.get("trip_id")];
             outbound = st[map.get("direction_id")].trim();
@@ -218,17 +281,17 @@ class GtfsParser extends Parser {
         }
 
         String currentBusId = null;
-        ArrayList<String> stopIdList = new ArrayList<>();
+        Map<Integer, String> stopSequenceToId = new TreeMap<>();
         HashMap<String, String[]> busMap = createBusMap(zipFile.getInputStream(zipFile.getEntry("gtfs022118/trips.txt")));
         HashSet<String> completedRoutes = new HashSet<>();
 
         String line;
         while ((line = br.readLine()) != null && !line.isEmpty()) {
 
-            String[] st = (line + " ").split(",");
+            String[] st = (line + ", ").split(",");
             String busId = st[map.get("trip_id")];
             String stopId = st[map.get("stop_id")];
-            String stopIndex = st[map.get("stop_sequence")];
+            int stopIndex = Integer.parseInt(st[map.get("stop_sequence")]);
 
             if (currentBusId == null) { //first line
                 currentBusId = busId;
@@ -239,26 +302,26 @@ class GtfsParser extends Parser {
                 String routeId = busMap.get(currentBusId)[0];
                 String outbound = busMap.get(currentBusId)[1];
                 if (!completedRoutes.contains(routeId)) {
-                    addStopsToRoutesInDatabase(stopIdList, routeId, outbound);
+                    addStopsToRoutesInDatabase(new ArrayList<>(stopSequenceToId.values()), routeId, outbound);
                     completedRoutes.add(routeId);
                 }
 
                 //for new trip
                 currentBusId = busId;
-                stopIdList = new ArrayList<>();
+                stopSequenceToId = new TreeMap<>();
             }
 
-            stopIdList.add(stopId);
+            stopSequenceToId.put(stopIndex, stopId);
 
         }
 
         br.close();
 
-        if (!stopIdList.isEmpty()) {
+        if (!stopSequenceToId.isEmpty()) {
             String routeId = busMap.get(currentBusId)[0];
             String outbound = busMap.get(currentBusId)[1];
             if (!completedRoutes.contains(routeId)) {
-                addStopsToRoutesInDatabase(stopIdList, routeId, outbound);
+                addStopsToRoutesInDatabase(new ArrayList<>(stopSequenceToId.values()), routeId, outbound);
             }
         }
     }
@@ -337,7 +400,7 @@ class GtfsParser extends Parser {
             }
             counter++;
 
-            String[] st = (line + " ").split(",");
+            String[] st = (line + ", ").split(",");
             String busId = st[map.get("trip_id")];
             String stopId = st[map.get("stop_id")];
             int arrivalTime = getLogicalTimeFromTimeString(st[map.get("arrival_time")]);
@@ -350,6 +413,7 @@ class GtfsParser extends Parser {
                     departureTime
             ));
         }
+        br.close();
 
         if (counter % 10000 > 0) {
             try {
@@ -358,8 +422,6 @@ class GtfsParser extends Parser {
                 sqlException.printStackTrace();
             }
         }
-
-        br.close();
     }
 
     /**
