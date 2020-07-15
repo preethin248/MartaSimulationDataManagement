@@ -135,7 +135,7 @@ public class SQLiteDatabase implements Database {
         return new Bus(
                 resultSet.getString("id"),
                 getRoute(resultSet.getString("route")),
-                resultSet.getInt("outbound") != 0,
+                resultSet.getInt("outbound") == 0,
                 resultSet.getInt("currentStop"),
                 resultSet.getDouble("latitude"),
                 resultSet.getDouble("longitude"),
@@ -200,8 +200,13 @@ public class SQLiteDatabase implements Database {
     public Collection<Bus> getAllBuses() throws SQLException {
         List<Bus> buses = new ArrayList<>();
         ResultSet rs = executeQuery("SELECT * FROM bus");
+
+        int counter = 0;
         while (rs.next()) {
             buses.add(getBus(rs));
+            counter++;
+            if (counter % 100 == 0)
+                System.out.println(counter);
         }
         return buses;
     }
