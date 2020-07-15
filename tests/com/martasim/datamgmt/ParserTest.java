@@ -24,7 +24,7 @@ public class ParserTest {
     @BeforeAll
     static void parse_data() throws SQLException, IOException {
         ZipFile zip = new ZipFile("./test-resources/gtfs022118.zip");
-        db = DatabaseFactory.createDatabaseFromGtfs(zip, DayOfTheWeek.MONDAY);
+        db = DatabaseFactory.createDatabaseFromGtfs(zip, "Monday");
     }
 
     private HashSet<String> getServiceIdsFromDay(DayOfTheWeek dayOfTheWeek, InputStream inputStream) throws IOException {

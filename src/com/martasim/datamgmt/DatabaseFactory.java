@@ -48,4 +48,25 @@ public class DatabaseFactory {
         (new GtfsParser(database, zipFile)).parse(dayOfTheWeek);
         return database;
     }
+
+    public static Database createDatabaseFromGtfs(ZipFile zipFile, String dayOfTheWeek) throws SQLException {
+        String editedDayOfTheWeek = dayOfTheWeek.trim().toLowerCase();
+        switch (editedDayOfTheWeek) {
+            case "monday":
+                return createDatabaseFromGtfs(zipFile, DayOfTheWeek.MONDAY);
+            case "tuesday":
+                return createDatabaseFromGtfs(zipFile, DayOfTheWeek.TUESDAY);
+            case "wednesday":
+                return createDatabaseFromGtfs(zipFile, DayOfTheWeek.WEDNESDAY);
+            case "thursday":
+                return createDatabaseFromGtfs(zipFile, DayOfTheWeek.THURSDAY);
+            case "friday":
+                return createDatabaseFromGtfs(zipFile, DayOfTheWeek.FRIDAY);
+            case "saturday":
+                return createDatabaseFromGtfs(zipFile, DayOfTheWeek.SATURDAY);
+            case "sunday":
+                return createDatabaseFromGtfs(zipFile, DayOfTheWeek.SUNDAY);
+        }
+        throw new RuntimeException(dayOfTheWeek + " is not a valid day of the week.");
+    }
 }
