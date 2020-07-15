@@ -130,12 +130,14 @@ public class ParserTest {
     @Test
     void parse_stopToRoute() throws IOException, SQLException {
         Route routeA = db.getRoute("7687");
-        //Route routeB = db.getRoute("7682");
-        //Route routeC = db.getRoute("8766");
+        Route routeB = db.getRoute("7682");
+        Route routeC = db.getRoute("8766");
 
-        assertEquals(routeA.getStops().size(), 58);
-       // assertEquals(routeB.getStops().size(), 39);
-       // assertEquals(routeC.getStops().size(), 15);
+        assertEquals(58, routeA.getStops().size());
+        assertEquals(39, routeB.getStops().size());
+        assertEquals("902725", routeB.getStops().get(0).getId());
+        assertEquals(15, routeC.getStops().size());
+        assertEquals("908515", routeC.getStops().get(routeC.getStops().size() - 1).getId());
     }
 
     @Test
