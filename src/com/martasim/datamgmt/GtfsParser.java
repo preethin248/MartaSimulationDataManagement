@@ -213,7 +213,6 @@ class GtfsParser extends Parser {
     }
 
     private void addBuses(InputStream inputStream, HashSet<String> serviceIds) throws IOException {
-    private void addBuses(Set<String> serviceIds, InputStream inputStream) throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
 
         Map<String, Pair<Double, Double>> shapeStartingLocations =
