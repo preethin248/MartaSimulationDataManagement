@@ -5,41 +5,41 @@ import java.util.List;
 import java.util.Objects;
 
 public class Route {
-    final int id;
-    int number;
+    String id;
+    String shortName;
     String name;
     List<Stop> stops;
 
-    public Route(int id, int number, String name) {
-        this(id, number, name, new ArrayList<>());
+    public Route(String id, String shortName, String name) {
+        this(id, shortName, name, new ArrayList<>());
     }
 
-    public Route(int id, int number, String name, List<Stop> stops) {
+    public Route(String id, String shortName, String name, List<Stop> stops) {
         this.id = id;
-        this.number = number;
+        this.shortName = shortName;
         this.name = name;
         this.stops = stops;
     }
 
     @Override
     public String toString() {
-        return "(" +
-                id + ", " +
-                number + ", " +
-                '\'' + name + '\'' +
+        return "('" +
+                id + "', '" +
+                shortName + "', '" +
+                 name + '\'' +
                 ")";
     }
 
-    public int getId() {
+    public String getId() {
         return id;
     }
 
-    public int getNumber() {
-        return number;
+    public String getShortName() {
+        return shortName;
     }
 
-    public void setNumber(int number) {
-        this.number = number;
+    public void setShortName(String shortName) {
+        this.shortName = shortName;
     }
 
     public String getName() {
@@ -63,14 +63,14 @@ public class Route {
         if (this == o) return true;
         if (!(o instanceof Route)) return false;
         Route route = (Route) o;
-        return id == route.id &&
-                number == route.number &&
+        return id.equals(route.id) &&
+                shortName.equals(route.shortName) &&
                 Objects.equals(name, route.name) &&
                 Objects.equals(stops, route.stops);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, number, name, stops);
+        return Objects.hash(id, shortName, name, stops);
     }
 }

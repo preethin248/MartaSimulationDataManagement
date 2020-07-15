@@ -3,47 +3,58 @@ package com.martasim.models;
 import java.util.Objects;
 
 public class Event implements Cloneable {
-    int id;
-    int time;
-    EventType type;
+    String busId;
+    String stopId;
+    int arrivalTime;
+    int departureTime;
 
-    public Event(int id, int time, EventType type) {
-        this.id = id;
-        this.time = time;
-        this.type = type;
+    public Event(String busId, String stopId, int arrivalTime, int departureTime) {
+        this.busId = busId;
+        this.stopId = stopId;
+        this.arrivalTime = arrivalTime;
+        this.departureTime = departureTime;
     }
 
     @Override
     public String toString() {
-        return "(" +
-                id +
-                ", " + time +
-                ", '" + type.name() + '\'' +
+        return "('" +
+                busId + "', '" +
+                stopId + "', " +
+                arrivalTime + ", " +
+                departureTime +
                 ')';
     }
 
-    public int getId() {
-        return id;
+    public String getBusId() {
+        return busId;
     }
 
-    public void setId(int id) {
-        this.id = id;
+    public void setBusId(String busId) {
+        this.busId = busId;
     }
 
-    public int getTime() {
-        return time;
+    public String getStopId() {
+        return stopId;
     }
 
-    public void setTime(int time) {
-        this.time = time;
+    public void setStopId(String stopId) {
+        this.stopId = stopId;
     }
 
-    public EventType getType() {
-        return type;
+    public int getArrivalTime() {
+        return arrivalTime;
     }
 
-    public void setType(EventType type) {
-        this.type = type;
+    public void setArrivalTime(int arrivalTime) {
+        this.arrivalTime = arrivalTime;
+    }
+
+    public int getDepartureTime() {
+        return departureTime;
+    }
+
+    public void setDepartureTime(int departureTime) {
+        this.departureTime = departureTime;
     }
 
     @Override
@@ -56,13 +67,14 @@ public class Event implements Cloneable {
         if (this == o) return true;
         if (!(o instanceof Event)) return false;
         Event event = (Event) o;
-        return id == event.id &&
-                time == event.time &&
-                Objects.equals(type, event.type);
+        return arrivalTime == event.arrivalTime &&
+                departureTime == event.departureTime &&
+                Objects.equals(busId, event.busId) &&
+                Objects.equals(stopId, event.stopId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, time, type);
+        return Objects.hash(busId, stopId, arrivalTime, departureTime);
     }
 }

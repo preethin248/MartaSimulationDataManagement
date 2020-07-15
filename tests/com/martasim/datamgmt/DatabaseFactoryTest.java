@@ -78,7 +78,7 @@ class DatabaseFactoryTest {
 
         Database db1 = DatabaseFactory.createEmptyDatabase(testfile);
 
-        Event e = new Event(0, 0, EventType.move_bus);
+        Event e = new Event("0", "0", 0, 0);
         db1.addEvent(e);
 
         assertEquals(db1.getAllEvents().size(), 1);
