@@ -1,9 +1,7 @@
 package com.martasim.datamgmt;
 
-import com.martasim.models.Bus;
 import com.martasim.models.Route;
 import javafx.util.Pair;
-import sun.reflect.generics.tree.Tree;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -11,12 +9,29 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 class GtfsParser extends Parser {
 
+    Map<String, ZipEntry> zipEntries = new HashMap<>();
+
     GtfsParser(Database database, ZipFile zipFile) {
         super(database, zipFile);
+
+        Enumeration<? extends ZipEntry> entries = zipFile.entries();
+        while (entries.hasMoreElements()) {
+            ZipEntry entry = entries.nextElement();
+            String name = entry.getName();
+            if (name.startsWith("__MACOSX"))
+                continue;
+
+            zipEntries.put(name.substring(name.lastIndexOf('/') + 1), entry);
+        }
+    }
+
+    private InputStream getInputStream(String fileName) throws IOException {
+        return zipFile.getInputStream(zipEntries.get(fileName));
     }
 
     @Override
@@ -24,20 +39,19 @@ class GtfsParser extends Parser {
         try {
             // TODO: get serviceIds based on the day of the week
             // TODO: get all routeIds to parse based on the serviceIds
-            System.out.println(zipFile.getName());
             System.out.println("Parsing Route");
             // TODO: pass in routeIds to parse
-            addRoutes(zipFile.getInputStream(zipFile.getEntry("gtfs022118/routes.txt")));
+            addRoutes(getInputStream("routes.txt"));
             System.out.println("Finished Routes, Parsing Stops");
-            addStops(zipFile.getInputStream(zipFile.getEntry("gtfs022118/stops.txt")));
+            addStops(getInputStream("stops.txt"));
             System.out.println("Finished Stops, Parsing Buses");
             // TODO: put hashSet of serviceIds based on the day of the week
-            addBuses(new HashSet<>(Arrays.asList("3", "4", "5")), zipFile.getInputStream(zipFile.getEntry("gtfs022118/trips.txt")));
+            addBuses(new HashSet<>(Arrays.asList("3", "4", "5")), getInputStream("trips.txt"));
             System.out.println("Finished Buses, Parsing StopsToRoute");
             // TODO: pass in routesIds to parse
-            addStopsToRoutes(zipFile.getInputStream(zipFile.getEntry("gtfs022118/stop_times.txt")));
+            addStopsToRoutes(getInputStream("stop_times.txt"));
             System.out.println("Finished StopsToRoutes, Parsing Events");
-            addEvents(zipFile.getInputStream(zipFile.getEntry("gtfs022118/stop_times.txt")));
+            addEvents(getInputStream("stop_times.txt"));
             System.out.println("Finished Events");
         } catch (IOException ioException) {
             ioException.printStackTrace();
@@ -143,7 +157,7 @@ class GtfsParser extends Parser {
         BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
 
         Map<String, Pair<Double, Double>> shapeStartingLocations =
-                getShapeStartingLocations(zipFile.getInputStream(zipFile.getEntry("gtfs022118/shapes.txt")));
+                getShapeStartingLocations(getInputStream("shapes.txt"));
 
         HashMap<String, Integer> map = new HashMap<>();
         String[] labels = br.readLine().split(",");
@@ -282,7 +296,7 @@ class GtfsParser extends Parser {
 
         String currentBusId = null;
         Map<Integer, String> stopSequenceToId = new TreeMap<>();
-        HashMap<String, String[]> busMap = createBusMap(zipFile.getInputStream(zipFile.getEntry("gtfs022118/trips.txt")));
+        HashMap<String, String[]> busMap = createBusMap(getInputStream("trips.txt"));
         HashSet<String> completedRoutes = new HashSet<>();
 
         String line;
