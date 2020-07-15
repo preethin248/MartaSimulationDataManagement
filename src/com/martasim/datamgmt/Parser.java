@@ -1,5 +1,7 @@
 package com.martasim.datamgmt;
 
+import com.martasim.models.DayOfTheWeek;
+
 import java.util.zip.ZipFile;
 
 abstract class Parser {
@@ -11,5 +13,5 @@ abstract class Parser {
         this.zipFile = zipFile;
     }
 
-    abstract void parse();
+    abstract void parse(DayOfTheWeek dayOfTheWeek);
 }

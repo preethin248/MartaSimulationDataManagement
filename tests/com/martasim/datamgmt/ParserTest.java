@@ -1,12 +1,18 @@
 package com.martasim.datamgmt;
 
+import com.martasim.models.DayOfTheWeek;
 import com.martasim.models.Route;
 import com.martasim.models.Stop;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.zip.ZipFile;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,7 +23,83 @@ public class ParserTest {
     @BeforeAll
     static void parse_data() throws SQLException, IOException {
         ZipFile zip = new ZipFile("./test-resources/gtfs022118.zip");
-        db = DatabaseFactory.createDatabaseFromGtfs(zip);
+        db = DatabaseFactory.createDatabaseFromGtfs(zip, DayOfTheWeek.MONDAY);
+    }
+
+    private HashSet<String> getServiceIdsFromDay(DayOfTheWeek dayOfTheWeek, InputStream inputStream) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
+
+        //initialize hash map with the first row of the file
+        HashMap<String, Integer> map = new HashMap<>();
+        String[] labels = br.readLine().split(",");
+        for (int i = 0; i < labels.length; i++) {
+            map.put(labels[i], i);
+        }
+
+        String dayOfService = "";
+
+        switch(dayOfTheWeek) {
+            case MONDAY:
+                dayOfService = "monday";
+                break;
+            case TUESDAY:
+                dayOfService = "tuesday";
+                break;
+            case WEDNESDAY:
+                dayOfService = "wednesday";
+                break;
+            case THURSDAY:
+                dayOfService = "thursday";
+                break;
+
+            case FRIDAY:
+                dayOfService = "friday";
+                break;
+            case SATURDAY:
+                dayOfService = "saturday";
+                break;
+            case SUNDAY:
+                dayOfService = "sunday";
+                break;
+        }
+
+        HashSet<String> serviceIds = new HashSet<>();
+
+        String line;
+        String serviceId;
+        while ((line = br.readLine()) != null && !line.isEmpty()) {
+            String st[] = (line + ", ").split(",");
+
+            if (st[map.get(dayOfService)].equals("1")) {
+                serviceId = st[map.get("service_id")];
+                serviceIds.add(serviceId);
+            }
+
+        }
+
+        br.close();
+
+        return serviceIds;
+    }
+
+    @Test
+    void parse_serviceIds() throws IOException {
+        ZipFile zipFile = new ZipFile("./test-resources/gtfs022118.zip");
+        HashSet<String> serviceIds1 = getServiceIdsFromDay(DayOfTheWeek.MONDAY, zipFile.getInputStream(zipFile.getEntry("gtfs022118/calendar.txt")));
+        HashSet<String> testServiceIds1 = new HashSet<>();
+        testServiceIds1.add("5");
+        assertEquals(testServiceIds1, serviceIds1);
+
+        HashSet<String> serviceIds2 = getServiceIdsFromDay(DayOfTheWeek.SATURDAY, zipFile.getInputStream(zipFile.getEntry("gtfs022118/calendar.txt")));
+        HashSet<String> testServiceIds2 = new HashSet<>();
+        testServiceIds2.add("3");
+        assertEquals(testServiceIds2, serviceIds2);
+
+        HashSet<String> serviceIds3 = getServiceIdsFromDay(DayOfTheWeek.SUNDAY, zipFile.getInputStream(zipFile.getEntry("gtfs022118/calendar.txt")));
+        HashSet<String> testServiceIds3 = new HashSet<>();
+        testServiceIds3.add("4");
+
+        assertEquals(testServiceIds3, serviceIds3);
     }
 
     @Test
@@ -49,6 +131,8 @@ public class ParserTest {
         Route routeA = db.getRoute("7687");
         Route routeB = db.getRoute("7682");
         Route routeC = db.getRoute("8766");
+
+
 
         assertEquals(routeA.getStops().size(), 55);
         assertEquals(routeB.getStops().size(), 39);

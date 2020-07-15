@@ -1,6 +1,7 @@
 package com.martasim.datamgmt;
 
 import com.martasim.models.Route;
+import com.martasim.models.DayOfTheWeek;
 import com.sun.xml.internal.ws.api.ha.StickyFeature;
 
 import java.io.BufferedReader;
@@ -20,15 +21,16 @@ class GtfsParser extends Parser {
     }
 
     @Override
-    public void parse() {
+    public void parse(DayOfTheWeek dayOfTheWeek) {
         try {
             System.out.println(zipFile.getName());
+            HashSet<String> serviceIds = getServiceIdsFromDay(dayOfTheWeek, zipFile.getInputStream(zipFile.getEntry("gtfs022118/calendar.txt")));
             System.out.println("Parsing Route");
             addRoutes(zipFile.getInputStream(zipFile.getEntry("gtfs022118/routes.txt")));
             System.out.println("Finished Routes, Parsing Stops");
             addStops(zipFile.getInputStream(zipFile.getEntry("gtfs022118/stops.txt")));
             System.out.println("Finished Stops, Parsing Buses");
-            addBuses(zipFile.getInputStream(zipFile.getEntry("gtfs022118/trips.txt")));
+            addBuses(zipFile.getInputStream(zipFile.getEntry("gtfs022118/trips.txt")), serviceIds);
             System.out.println("Finished Buses, Parsing StopsToRoute");
             addStopsToRoutes(zipFile.getInputStream(zipFile.getEntry("gtfs022118/stop_times.txt")));
             System.out.println("Finished StopsToRoutes, Parsing Events");
@@ -37,6 +39,62 @@ class GtfsParser extends Parser {
         } catch (IOException ioException) {
             ioException.printStackTrace();
         }
+    }
+
+    private HashSet<String> getServiceIdsFromDay(DayOfTheWeek dayOfTheWeek, InputStream inputStream) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
+
+        //initialize hash map with the first row of the file
+        HashMap<String, Integer> map = new HashMap<>();
+        String[] labels = br.readLine().split(",");
+        for (int i = 0; i < labels.length; i++) {
+            map.put(labels[i], i);
+        }
+
+        String dayOfService = "";
+
+        switch(dayOfTheWeek) {
+            case MONDAY:
+                dayOfService = "monday";
+                break;
+            case TUESDAY:
+                dayOfService = "tuesday";
+                break;
+            case WEDNESDAY:
+                dayOfService = "wednesday";
+                break;
+            case THURSDAY:
+                dayOfService = "thursday";
+                break;
+
+            case FRIDAY:
+                dayOfService = "friday";
+                break;
+            case SATURDAY:
+                dayOfService = "saturday";
+                break;
+            case SUNDAY:
+                dayOfService = "sunday";
+                break;
+        }
+
+        HashSet<String> serviceIds = new HashSet<>();
+
+        String line;
+        String serviceId;
+        while ((line = br.readLine()) != null && !line.isEmpty()) {
+            String st[] = (line + ", ").split(",");
+
+            if (st[map.get(dayOfService)].equals("1")) {
+                serviceId = st[map.get("service_id")];
+                serviceIds.add(serviceId);
+            }
+
+        }
+
+        br.close();
+
+        return serviceIds;
     }
 
     private void addRoutes(InputStream inputStream) throws IOException {
@@ -134,7 +192,7 @@ class GtfsParser extends Parser {
         br.close();
     }
 
-    private void addBuses(InputStream inputStream) throws IOException {
+    private void addBuses(InputStream inputStream, HashSet<String> serviceIds) throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
 
         HashMap<String, Integer> map = new HashMap<>();

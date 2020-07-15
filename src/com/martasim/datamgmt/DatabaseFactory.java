@@ -1,5 +1,7 @@
 package com.martasim.datamgmt;
 
+import com.martasim.models.DayOfTheWeek;
+
 import java.io.File;
 import java.sql.SQLException;
 import java.util.zip.ZipFile;
@@ -41,9 +43,9 @@ public class DatabaseFactory {
      * @return a Database located in the MartaDatabase.db file that is populated with the GTFS data
      * @throws SQLException
      */
-    public static Database createDatabaseFromGtfs(ZipFile zipFile) throws SQLException {
+    public static Database createDatabaseFromGtfs(ZipFile zipFile, DayOfTheWeek dayOfTheWeek) throws SQLException {
         Database database = createEmptyDatabase();
-        (new GtfsParser(database, zipFile)).parse();
+        (new GtfsParser(database, zipFile)).parse(dayOfTheWeek);
         return database;
     }
 }
